@@ -126,7 +126,9 @@
       const dayName = dayNames[parsedDate.getDay()]
       const options = { month: 'short', day: 'numeric' }
       const label = parsedDate.toLocaleDateString('en-US', options)
-      const status = (isCurrentWeekSubmitted.value && d.status === 'open') ? 'deadline_passed' : d.status
+
+      // Lock the card ONLY if the deadline has actually passed
+      const status = (isWeekDeadlinePassed.value && d.status === 'open') ? 'deadline_passed' : d.status
 
       return {
         date: d.date,
@@ -310,7 +312,7 @@
         <v-row>
           <v-col class="mr-auto" cols="12" md="4" sm="6">
             <WeekSelectionSummary
-              :is-deadline-passed="isWeekDeadlinePassed || isCurrentWeekSubmitted"
+              :is-deadline-passed="isWeekDeadlinePassed"
               :is-saving-draft="isSavingDraft"
               :is-submitting="isSubmitting"
               :is-submitting-all="isSubmittingAll"
