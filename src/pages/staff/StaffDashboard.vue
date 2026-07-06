@@ -10,8 +10,11 @@
   import { useMenuStore } from '@/stores/menu.store'
   import { useOrderStore } from '@/stores/orders.store'
   import { getWeekDates, getWeekString, parseLocalDate } from '@/utils/dateHelpers'
+  import SkeletonCard from '@/components/shared/SkeletonCard.vue'
+  import { useRouter } from 'vue-router'
 
   // Load composables and stores
+  const router = useRouter()
   const { user } = useAuth()
   const orderStore = useOrderStore()
   const menuStore = useMenuStore()
@@ -24,11 +27,20 @@
   onMounted(async () => {
     try {
       const mondayStr = getWeekString(new Date())
+      const nextMondayStr = nextWeekStart.value
+
+      // 1. Fetch next week's deadline first so isDeadlinePassed is calculated correctly
+      await menuStore.getWeekDeadline(nextMondayStr)
+
+      // 2. Fetch all menu items and user orders in parallel
       await Promise.all([
         orderStore.getMyOrders(user.value.id),
         menuStore.getAllMenuItems(),
-        fetchWeekMenu(mondayStr),
       ])
+
+      // 3. Load the menu for either current week or next week based on deadline status
+      const targetWeek = isDeadlinePassed.value ? nextMondayStr : mondayStr
+      await fetchWeekMenu(targetWeek)
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
     } finally {
@@ -48,41 +60,54 @@
   // Monday date string for the current week
   const currentWeekStart = computed(() => getWeekString(new Date()))
 
-  // Subtitle date info: e.g., "Monday, Jun 8 • Week of Jun 8 - 12"
   const dateSubtitle = computed(() => {
     const options = { weekday: 'long', month: 'short', day: 'numeric' }
     const formattedToday = new Date().toLocaleDateString('en-US', options)
 
-    // Get Mon-Fri range label
-    const range = weekRangeLabel(0) // e.g. "Jun 8 - Jun 12, 2026"
+    // Get Mon-Fri range label based on which week we are showing
+    const range = weekRangeLabel(weekOffset.value) // e.g. "Jun 8 - Jun 12, 2026"
     // Strip the year for a cleaner look
     const rangeShort = range.split(',')[0]
 
     return `${formattedToday} • Week of ${rangeShort}`
   })
 
-  // Calculate deadline details
-  const deadlineIso = computed(() =>
-    menuStore.deadlineByWeek(currentWeekStart.value) ?? null,
+  // Monday date string for the next week
+  const nextWeekStart = computed(() => getWeekString(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)))
+
+  // Calculate next week deadline details
+  const nextWeekDeadlineIso = computed(() =>
+    menuStore.deadlineByWeek(nextWeekStart.value) ?? null,
   )
   const isDeadlinePassed = computed(() => {
-    if (!deadlineIso.value) return false
-    return new Date() > new Date(deadlineIso.value)
+    if (!nextWeekDeadlineIso.value) return false
+    return new Date() > new Date(nextWeekDeadlineIso.value)
   })
 
-  // Check if current week's order is fully submitted
-  const isCurrentWeekSubmitted = computed(() => {
-    const currentOrders = orderStore.myOrders.filter(
-      o => o.weekString === currentWeekStart.value,
+  // Determine display week offset (0 = current week, 1 = next week)
+  const weekOffset = computed(() => isDeadlinePassed.value ? 1 : 0)
+
+  // Monday date string of the week to display
+  const displayWeekStart = computed(() => isDeadlinePassed.value ? nextWeekStart.value : currentWeekStart.value)
+
+  // Computed title for the selections section
+  const sectionTitle = computed(() => {
+    return isDeadlinePassed.value ? "Next Week's Confirmed Orders" : "This week's selections"
+  })
+
+  // Check if next week's order is fully submitted
+  const isNextWeekSubmitted = computed(() => {
+    const nextOrders = orderStore.myOrders.filter(
+      o => o.weekString === nextWeekStart.value,
     )
-    if (currentOrders.length === 0) return false
-    return currentOrders.every(o => o.status === 'submitted')
+    if (nextOrders.length === 0) return false
+    return nextOrders.every(o => o.status === 'submitted')
   })
 
   // Current Week's selections mapped for Mon-Fri
   const thisWeekSummary = computed(() => {
     // Mon-Fri labels: e.g., [{ date: "2026-06-08", label: "Mon" }]
-    const labels = weekDayLabels(0)
+    const labels = weekDayLabels(weekOffset.value)
 
     return labels.map(day => {
       // Check if day is off/holiday in menu
@@ -128,14 +153,18 @@
   // Historical weeks for "Previous Weeks" summary list
   const previousWeeks = computed(() => {
     const groups = {}
-
     // Sort orders descending
     const sortedOrders = [...orderStore.myOrders].sort((a, b) => b.date.localeCompare(a.date))
-
     for (const order of sortedOrders) {
-      // Filter out current week start
-      if (order.weekString === currentWeekStart.value) continue
-
+      // 1. If we are showing NEXT week on the main cards (deadline passed):
+      //    Show the CURRENT week in the history list (filter out next week and future weeks).
+      // 2. If we are showing CURRENT week on the main cards (before deadline):
+      //    Filter out both current and next week from the history list.
+      if (isDeadlinePassed.value) {
+        if (order.weekString === nextWeekStart.value) continue
+      } else {
+        if (order.weekString === currentWeekStart.value || order.weekString === nextWeekStart.value) continue
+      }
       if (!groups[order.weekString]) {
         groups[order.weekString] = []
       }
@@ -184,10 +213,16 @@
   <AppShell>
     <div style="max-width: 1400px; margin: 0 auto; padding: 0 16px;">
       <!-- Loading State -->
-      <div v-if="isLoading" class="text-center py-12">
-        <v-progress-circular color="#D2451E" indeterminate size="45" />
-        <div class="mt-4">Loading dashboard...</div>
-      </div>
+      <v-row v-if="isLoading">
+        <v-col 
+          v-for="i in 3" :key="i" 
+          cols="12" 
+          md="4" 
+          sm="12"
+        >
+          <SkeletonCard />
+        </v-col>
+      </v-row>
 
       <div v-else>
         <!-- Greeting Header -->
@@ -203,11 +238,11 @@
 
         <v-divider class="border-opacity-25 my-6" />
 
-        <!-- Section 1: This Week's Selections -->
+        <!-- Section 1: Dynamic Selections -->
 
         <div class="mb-8">
           <h2 class="font-weight-bold mb-4">
-            This week's selections
+            {{ sectionTitle }}
           </h2>
 
           <v-row class="ma-0 ga-3 d-flex flex-wrap justify-space-between">
@@ -227,10 +262,11 @@
                 <!-- Food Image (top portion) -->
                 <v-img
                   v-if="day.imageUrl"
-                  class="flex-shrink-0"
+                  class="flex-shrink-0 clickable-image"
                   cover
                   height="200"
                   :src="day.imageUrl"
+                  @click="router.push('/weekly-overview')"
                 >
                   <template #error>
                     <div class="d-flex align-center justify-center" style="height: 200px; background-color: #F5F2EC;">
@@ -241,8 +277,9 @@
 
                 <div
                   v-else
-                  class="d-flex align-center justify-center flex-shrink-0"
+                  class="d-flex align-center justify-center flex-shrink-0 clickable-image"
                   style="height: 200px; background-color: #F5F2EC;"
+                  @click="router.push('/weekly-overview')"
                 >
                   <v-icon color="#D2451E" size="80">mdi-food</v-icon>
                 </div>
@@ -273,8 +310,8 @@
 
         <!-- Deadline Notification Banner -->
         <DeadlineAlert
-          v-if="!isCurrentWeekSubmitted && deadlineIso"
-          :deadline-iso="deadlineIso"
+          v-if="!isNextWeekSubmitted && nextWeekDeadlineIso"
+          :deadline-iso="nextWeekDeadlineIso"
           to="/weekly-overview"
         />
 
@@ -318,5 +355,12 @@
 </template>
 
 <style scoped>
-
+.clickable-image {
+  cursor: pointer;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+.clickable-image:hover {
+  opacity: 0.9;
+  transform: scale(1.10);
+}
 </style>

@@ -69,20 +69,20 @@
   >
     <!-- Icon Container -->
     <v-avatar class="mr-4" color="white" rounded="lg" size="48">
-      <v-icon :color="isPassed ? '#757575' : (isUrgent ? '#E65100' : '#D2451E')" size="33">
+      <v-icon :color="isPassed ? '#D2451E' : (isUrgent ? '#D2451E' : '#D2451E')" size="33">
         {{ isPassed ? 'mdi-alert-circle' : (isUrgent ? 'mdi-alert-decagram' : 'mdi-calendar-clock') }}
       </v-icon>
     </v-avatar>
 
     <!-- Text Section -->
     <div class="flex-grow-1">
-      <div class="font-weight-bold" :style="{ color: isPassed ? '#616161' : 'white' }" style="font-size: 20px;">
-        {{ isPassed ? 'Ordering deadline has passed' : (isUrgent ? 'Urgent: Complete your meal selection!' : 'Select your meals for this week') }}
+      <div class="font-weight-bold" :style="{ color: 'white' }" style="font-size: 20px;">
+        {{ isPassed ? 'Ordering deadline has passed' : (isUrgent ? 'Urgent: Complete your meal selection!' : 'Select your meals for next week') }}
       </div>
 
-      <div :style="{ color: isPassed ? '#757575' : 'white' }" class="font-weight-medium">
+      <div :style="{ color: isPassed ? 'white' : 'white' }" class="font-weight-medium">
         <template v-if="isPassed">
-          Meal selection is now locked for this week.
+          Meal selection is now locked for next week.
         </template>
         <template v-else-if="isUrgent">
           Deadline in:

@@ -22,20 +22,16 @@
   const imageFile = ref(null)
   const maxSize = 500_000  // 500 KB
 
-  // Function to convert file to base64
-  // function handleFileUpload (file) {
-  //   if (!file) return
-  //   const reader = new FileReader()
-  //   reader.addEventListener('load', e => {
-  //     formData.value.imageUrl = e.target.result // Save base64 string to imageUrl
-  //   })
-  //   reader.readAsDataURL(file)
-  // }
-
   function handleFileUpload (file) {
     formData.value.imageFile = file  // store raw File
     formData.value.imageUrl = URL.createObjectURL(file)  // preview
   }
+
+  // Food types
+  const foodTypes = [...VENDORS, "Other"]
+
+  const otherType = ref('')
+  const showOtherInput = ref(false)
 
   // Form data
   const formData = ref({
@@ -53,8 +49,11 @@
   ]
 
   const descriptionRules = [
-    v => !!v || 'Description is required',
-    v => (v && v.length >= 10) || 'Description must be at least 10 characters',
+    // v => !!v || 'Description is required',
+    v => {
+      if (v && v.length >= 10) return 'Description must be at least 10 characters'
+      return true
+    }
   ]
 
   const imageRules = [
@@ -65,8 +64,10 @@
     }
   ]
 
-  // Food types
-  const foodTypes = VENDORS
+  const otherTypeRules = [
+    v => (formData.value.type !== 'Other' || !!v) || 'Custom vendor type is required',
+    v => (formData.value.type !== 'Other' || (v && v.trim().length >= 2)) || 'Custom vendor type must be at least 2 characters',
+  ]
 
   // Dialog title
   const dialogTitle = computed(() => {
@@ -76,12 +77,18 @@
   // Watch for food item changes (when editing)
   watch(() => props.foodItem, newItem => {
     if (newItem) {
+
+      const isPredefined = VENDORS.includes(newItem.type)
+
       formData.value = {
         title: newItem.title || '',
         description: newItem.description || '',
         imageUrl: newItem.imageUrl || '',
-        type: newItem.type || VENDORS[0],
+        type: isPredefined ? (newItem.type || VENDORS[0]) : "Other",
       }
+
+      otherType.value = isPredefined ? "" : (newItem.type || "")
+      showOtherInput.value = !isPredefined
 
       // Convert base64 imageUrl back to a File object for v-file-input display
       if (newItem.imageUrl && newItem.imageUrl.startsWith('data:')) {
@@ -135,6 +142,8 @@
       imageUrl: '',
       type: VENDORS[0],
     }
+    otherType.value = ''
+    showOtherInput.value = false
     imageFile.value = null //Reset file input
   }
 
@@ -144,7 +153,8 @@
 
   function handleSave () {
     if (isValid.value) {
-      emit('save', { ...formData.value })
+      const finalType = formData.value.type === 'Other' ? otherType.value.trim() : formData.value.type
+      emit('save', { ...formData.value, type: finalType })
     }
   }
 </script>
@@ -201,7 +211,7 @@
           <div>
             <label class="font-weight-bold mb-2 d-block" style="color: #1E1E1E;">
               <v-icon class="mr-2">mdi-note-text-outline</v-icon>
-              Description *
+              Description
             </label>
 
             <v-textarea
@@ -247,6 +257,24 @@
               variant="outlined"
             />
           </div>
+          <!-- Custom Vendor Type (Other) -->
+           <v-expand-transition>
+            <div v-if="formData.type === 'Other'" class="mb-4">
+              <label class="font-weight-bold mb-2 d-block" style="color: #1E1E1E;">
+                <v-icon class="mr-2"> mdi-pencil-box-outline</v-icon>
+                  Custom Vendor Type *
+              </label>
+              <v-text-field
+                v-model="otherType"
+                density="comfortable"
+                placeholder="e.g. Local Joint"
+                :rules="otherTypeRules"
+                variant="outlined"
+              />
+            </div>
+           </v-expand-transition>
+
+          
 
           <!-- Image Preview -->
           <div v-if="formData.imageUrl" class="mb-4">

@@ -1,6 +1,6 @@
 <script setup>
   import { storeToRefs } from 'pinia'
-  import { computed, onMounted, ref } from 'vue'
+  import { computed, onMounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
   import AppShell from '@/components/layout/AppShell.vue'
   import DayMenuCard from '@/components/menu/DayMenuCard.vue'
@@ -11,6 +11,7 @@
   import { useOrderStore } from '@/stores/orders.store.js'
   import { useStaffStore } from '@/stores/staff.store.js'
   import { getWeekDates, getWeekString } from '@/utils/dateHelpers.js'
+  import SkeletonCard from '../../components/shared/SkeletonCard.vue'
 
   const router = useRouter()
 
@@ -28,7 +29,14 @@
   const { success: snackSuccess, error: snackError } = useSnackbar()
 
   // Week offset state (0 = current week)
-  const weekOffset = ref(0)
+  const weekOffset = ref(1)
+
+  // Dynamic page title based on week offset
+  const pageTitle = computed(() => {
+    if (weekOffset.value === 0) return 'This week'
+    if (weekOffset.value === 1) return 'Next week'
+    return 'Week Overview'
+  })
 
   // Computed: current deadline for the visible week
   const currentWeekString = computed(() => getWeekString(getWeekDates(weekOffset.value)[0]))
@@ -54,12 +62,25 @@
     }
   }
 
+  // Pre-fill the picker fields when HR re-opens the deadline menu
+  watch(showDeadlineMenu, (isOpen) => {
+    if (isOpen && savedDeadline.value) {
+      const d = new Date(savedDeadline.value)
+      const year  = d.getFullYear()
+      const month = String(d.getMonth() + 1).padStart(2, '0')
+      const day   = String(d.getDate()).padStart(2, '0')
+      deadlineDate.value = `${year}-${month}-${day}`
+      deadlineTime.value = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+  })
+
   // Use the composable to fetch menu data
   const { weekMenu, weekDays, isLoading, fetchWeekMenu } = useWeekMenu()
 
   // Fetch all data on mount
   onMounted(async () => {
-    const weekStartDate = getWeekString(new Date())
+    // Fetch menu for next week FIRST
+    const weekStartDate = getWeekString(getWeekDates(1)[0])
 
     // Fetch all data in parallel
     await Promise.all([
@@ -165,12 +186,12 @@
 
   // Helper function inline or reuse formatDate from dateHelpers
   const weekMin = computed(() => {
-    const d = getWeekDates(weekOffset.value)[0]
+    const d = getWeekDates(0)[0]
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })
 
   const weekMax = computed(() => {
-    const d = getWeekDates(weekOffset.value)[4]
+    const d = getWeekDates(0)[4]
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })
 
@@ -193,7 +214,7 @@
             class="font-weight-bold text-display-medium"
             style="letter-spacing: 0.5px; color: #D2451E !important;"
           >
-            This week
+            {{ pageTitle }}
           </h1>
         </v-col>
 
@@ -244,7 +265,7 @@
               <!-- Left: label + current deadline display -->
               <div>
                 <div class="font-weight-medium mb-1" style="font-size: 20px; color: #1E1E1E;">
-                  Ordering deadline this week
+                  Deadline for next week's orders
                 </div>
 
                 <div v-if="savedDeadline" class="d-flex align-center ga-2">
@@ -260,7 +281,7 @@
                 </div>
 
                 <div v-else style="font-size: 16px; color: #1E1E1E;">
-                  No deadline set — staff can order any time
+                  No deadline set for next week — staff can order any time
                 </div>
               </div>
 
@@ -330,15 +351,17 @@
       </v-row>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="text-center py-12">
-        <v-progress-circular
-          color="#D2451E"
-          indeterminate
-          size="45"
-        />
-
-        <div class="mt-4">Loading menu...</div>
-      </div>
+      <v-row v-if="isLoading">
+        <v-col
+          v-for="i in 3"
+          :key="i"
+          cols="12"
+          md="4"
+          sm="12"
+        >
+          <SkeletonCard />
+        </v-col>
+      </v-row>
 
       <!-- Weekly Menu Grid -->
       <v-row v-else>

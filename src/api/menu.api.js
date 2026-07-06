@@ -166,11 +166,23 @@ export async function createMenuApi (data) {
 // function of axios api to update request
 export async function updateMenuApi (id, data) {
   try {
+    let imageUrl = data.imageUrl || ''
+
+    // Upload image first if a new file was selected during editing
+    if (data.imageFile) {
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', data.imageFile)
+      const uploadRes = await api.post('/menu/upload-image', uploadFormData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      imageUrl = uploadRes.data.image_url
+    }
+
     const backendData = {
       id: Number(id),
       title: data.title,
       description: data.description,
-      image_url: data.imageUrl,
+      image_url: imageUrl,
       type: data.type,
       day: data.day,
       date: data.date,

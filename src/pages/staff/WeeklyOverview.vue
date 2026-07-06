@@ -1,5 +1,5 @@
 <script setup>
-  import { computed, onMounted, onUnmounted, ref } from 'vue'
+  import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRouter } from 'vue-router'
   import AppShell from '@/components/layout/AppShell.vue'
   import DayOrderCard from '@/components/staff/DayOrderCard.vue'
@@ -11,6 +11,7 @@
   import { useMenuStore } from '@/stores/menu.store'
   import { useOrderStore } from '@/stores/orders.store'
   import { getWeekString, parseLocalDate } from '@/utils/dateHelpers'
+  import SkeletonCard from '@/components/shared/SkeletonCard.vue'
 
   const router = useRouter()
 
@@ -35,25 +36,24 @@
   // Fetch data and hydrate selections on mount
   onMounted(async () => {
     try {
-
-      const mondayStr = getWeekString(new Date())
+      const nextWeekMonday = getWeekString(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
 
       // Fetch menu and user orders in parallel
       await Promise.all([
-        fetchWeekMenu(mondayStr),
+        fetchWeekMenu(nextWeekMonday),
         orderStore.getMyOrders(user.value.id),
       ])
 
       // Hydrate selections draft:
       // Gather all valid menu dates
       const availableDates = weekDays.value.map(d => d.date)
-      initDraft(mondayStr, availableDates)
+      initDraft(nextWeekMonday, availableDates)
 
       // Pull existing database selections
-      const myOrdersThisWeek = orderStore.myOrders.filter(
-        o => o.weekString === mondayStr,
+      const myOrdersNextWeek = orderStore.myOrders.filter(
+        o => o.weekString === nextWeekMonday,
       )
-      for (const order of myOrdersThisWeek) {
+      for (const order of myOrdersNextWeek) {
         if (order.menuItemId) {
           selectItem(order.date, order.menuItemId)
         }
@@ -61,7 +61,9 @@
 
       updateCountdown()
       timer = setInterval(updateCountdown, 1000)
-      if (timer) clearInterval(timer)
+      
+      // Poll the backend every 60 seconds for deadline changes made by HR
+      pollTimer = setInterval(() => menuStore.getWeekDeadline(nextWeekStart.value), 60_000)
       
     } catch (error) {
       console.error('Failed to load menu/order overview:', error)
@@ -70,9 +72,9 @@
     }
   })
 
-  const currentWeekStart = computed(() => getWeekString(new Date()))
+  const nextWeekStart = computed(() => getWeekString(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)))
 
-  const deadlineIso = computed(() => menuStore.deadlineByWeek(currentWeekStart.value))
+  const deadlineIso = computed(() => menuStore.deadlineByWeek(nextWeekStart.value))
   const deadlineLabel = computed(() => {
     if (!deadlineIso.value) return 'No deadline set'
     return new Date(deadlineIso.value).toLocaleString('en-US', {
@@ -86,16 +88,17 @@
   })
 
   const isCurrentWeekSubmitted = computed(() => {
-    const currentOrders = orderStore.myOrders.filter(
-      o => o.weekString === currentWeekStart.value,
+    const nextOrders = orderStore.myOrders.filter(
+      o => o.weekString === nextWeekStart.value,
     )
-    if (currentOrders.length === 0) return false
-    return currentOrders.every(o => o.status === 'submitted')
+    if (nextOrders.length === 0) return false
+    return nextOrders.every(o => o.status === 'submitted')
   })
 
   // --- Countdown Timer Logic ---
   const countdown = ref({ days: 0, hours: 0, mins: 0, secs: 0 })
   let timer = null
+  let pollTimer = null   // ← polling interval for deadline refresh (60s)
 
   function updateCountdown () {
     if (!deadlineIso.value) return
@@ -119,6 +122,36 @@
     }
   }
 
+  // Revert auto-submitted orders back to 'pending' when HR extends a passed deadline
+  async function revertExpiredOrders (weekString) {
+    const ordersToRevert = orderStore.myOrders.filter(
+      o => o.weekString === weekString && o.status === 'submitted',
+    )
+    for (const order of ordersToRevert) {
+      await orderStore.updateOrder(order.id, { ...order, status: 'pending' })
+    }
+    // Refresh so UI reflects the reverted status immediately
+    await orderStore.getMyOrders(user.value.id)
+  }
+
+  // Watch for HR extending a deadline that had already passed
+  watch(deadlineIso, async (newDeadline, oldDeadline) => {
+    if (!oldDeadline || !newDeadline) return
+
+    const wasPassed = new Date() > new Date(oldDeadline)
+    const nowPassed = new Date() > new Date(newDeadline)
+
+    if (wasPassed && !nowPassed) {
+      // Deadline was extended into the future → restart the countdown timer
+      if (timer) clearInterval(timer)
+      updateCountdown()
+      timer = setInterval(updateCountdown, 1000)
+
+      // Revert any auto-submitted orders back to pending so staff can edit again
+      await revertExpiredOrders(nextWeekStart.value)
+    }
+  })
+
   // Map day status and labels
   const mappedWeekDays = computed(() => {
     return weekDays.value.map(d => {
@@ -127,7 +160,9 @@
       const dayName = dayNames[parsedDate.getDay()]
       const options = { month: 'short', day: 'numeric' }
       const label = parsedDate.toLocaleDateString('en-US', options)
-      const status = (isCurrentWeekSubmitted.value && d.status === 'open') ? 'deadline_passed' : d.status
+
+      // Lock the card ONLY if the deadline has actually passed
+      const status = (isWeekDeadlinePassed.value && d.status === 'open') ? 'deadline_passed' : d.status
 
       return {
         date: d.date,
@@ -173,27 +208,65 @@
     await saveDraft()
     router.push('/staff-dashboard')
   }
+
+  // Smart back button fallback helper
+  function goBack() {
+    if (window.history.state && window.history.state.back) {
+      router.back()
+    } else {
+      router.push('/staff-dashboard')
+    }
+  }
+
+  // Clean up the timer when leaving the page
+  onUnmounted(() => {
+    if (timer) clearInterval(timer)
+    if (pollTimer) clearInterval(pollTimer)
+  })
 </script>
 
 <template>
   <AppShell>
     <div style="max-width: 1400px; margin: 0 auto; padding: 0 16px;">
+      
       <!-- Loading State -->
-      <div v-if="pageLoading || isLoading" class="text-center py-12">
-        <v-progress-circular color="#D2451E" indeterminate size="45" />
-        <div class="mt-4">Loading weekly menu...</div>
-      </div>
+      <v-row v-if="pageLoading || isLoading">
+        <v-col
+          v-for="i in 3"
+          :key="i"
+          cols="12"
+          sm="12"
+          md="4"
+        >
+          <SkeletonCard />
+        </v-col>
+      </v-row>
 
       <div v-else>
+        <!-- Back button -->
+        <v-row class="d-flex align-center justify-space-between">
+          <v-col class="d-flex justify-start align-center" cols="12" sm="6">
+            <v-btn
+              prepend-icon="mdi-arrow-left"
+              variant="flat"
+              color="#D2451E"
+              class="mr-2 mt-4"
+              @click="goBack"
+            > 
+            Go back 
+            </v-btn>
+          </v-col>
+        </v-row>
+
         <!-- Header -->
-        <v-row class="d-flex mb-4 align-center justify-space-between">
-          <v-col class="d-flex justify-start" cols="12" sm="6">
+        <v-row class="d-flex mb-4 mt-n1 align-center justify-space-between">
+          <v-col class="d-flex justify-start align-center" cols="12" sm="6">
             <h1 class="font-weight-bold text-display-medium" style="color: #1E1E1E;">
-              Order this week
+              Order for Next Week
             </h1>
           </v-col>
 
-          <v-col class="d-flex justify-sm-end align-center" cols="12" sm="6">
+          <v-col class="d-flex flex-column ga-3 justify-sm-end align-end" cols="12" sm="6">
             <v-chip
               v-if="isCurrentWeekSubmitted"
               class="font-weight-bold px-4 py-5 text-white animate-pulse"
@@ -272,9 +345,9 @@
 
         <!-- Summary Section -->
         <v-row>
-          <v-col class="mx-auto" cols="12">
+          <v-col class="mr-auto" cols="12" md="4" sm="6">
             <WeekSelectionSummary
-              :is-deadline-passed="isWeekDeadlinePassed || isCurrentWeekSubmitted"
+              :is-deadline-passed="isWeekDeadlinePassed"
               :is-saving-draft="isSavingDraft"
               :is-submitting="isSubmitting"
               :is-submitting-all="isSubmittingAll"

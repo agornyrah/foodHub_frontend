@@ -78,67 +78,26 @@
     variant="flat"
   >
     <div class="font-weight-medium text-white mb-4" style="font-size: 20px;">
-      Your Order Summary
+      Your Order Actions
     </div>
 
-    <!-- Summary List -->
-    <v-list class="pa-5 rounded-lg mb-6 d-flex flex-column ga-3">
-      <div
-        v-for="item in summaryItems"
-        :key="item.date"
-        class="d-flex align-center justify-space-between py-1"
-      >
-        <span class="font-weight-medium" style="width: 70px; font-size: 17px;">
-          {{ item.dayLabel }}
-        </span>
-
-        <div class="d-flex align-center justify-end flex-grow-1">
-          <v-icon
-            v-if="item.isOffDay"
-            class="mr-1"
-            color="#C62828"
-            size="16"
-          >
-            mdi-umbrella-beach-outline
-          </v-icon>
-
-          <span style="font-size: 17px;" :style="item.textStyle">
-            {{ item.displayText }}
-          </span>
-        </div>
-      </div>
-    </v-list>
-
-    <!-- <v-alert
-      v-if="isDeadlinePassed"
-      type="warning"
-      variant="tonal"
-      density="compact"
-      class="mb-4 text-caption"
-      text="The ordering deadline for this week has passed. Selections cannot be modified."
-    /> -->
-
     <!-- Buttons -->
-    <div class="d-flex flex-column flex-sm-row ga-3 mb-3">
-      <!-- Save Draft Button (Now on the left) -->
+    <div class="d-flex flex-column ga-3 mb-3">
+      <!-- Save Draft Button -->
       <v-btn
-        class="text-capitalize font-weight-medium rounded-lg py-5 flex-1-1"
+        class="text-capitalize font-weight-medium rounded-lg py-5 w-100"
         :class="{ 'disabled-white-btn': !hasSelections || isSavingDraft || isSubmittingAll || isDeadlinePassed }"
         :disabled="!hasSelections || isSavingDraft || isSubmittingAll || isDeadlinePassed"
         :loading="isSavingDraft"
-        :style="{
-          backgroundColor: 'white !important',
-          color: (!hasSelections || isSavingDraft || isSubmittingAll || isDeadlinePassed) ? 'rgba(0,0,0,0.38) !important' : '#1E1E1E !important'
-        }"
         variant="flat"
         @click="emit('save-draft')"
       >
         Save as Draft
       </v-btn>
 
-      <!-- Submit All Button (Now on the right) -->
+      <!-- Submit All Button -->
       <v-btn
-        class="text-capitalize font-weight-medium rounded-lg py-5 flex-1-1"
+        class="text-capitalize font-weight-medium rounded-lg py-5 w-100"
         color="white"
         :disabled="!hasSelections || isSubmitting || isDeadlinePassed"
         :loading="isSubmittingAll"
@@ -153,14 +112,5 @@
 </template>
 
 <style scoped>
-/* Override Vuetify's disabled button styling */
-:deep(.v-btn.v-btn--disabled) {
-  opacity: 1 !important;
-}
-
-.disabled-white-btn {
-  pointer-events: none;
-  cursor: not-allowed;
-}
 
 </style>

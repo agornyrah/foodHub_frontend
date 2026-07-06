@@ -10,6 +10,7 @@
   import { useSnackbar } from '@/composables/useSnackbar.js'
   import { useWeekMenu } from '@/composables/useWeekMenu.js'
   import { formatDate, getWeekDates, getWeekString, parseLocalDate } from '@/utils/dateHelpers.js'
+  import SkeletonCard from '../../components/shared/SkeletonCard.vue'
   
   //Mobile responsiveness
   import { useDisplay } from 'vuetify'
@@ -20,7 +21,7 @@
   const { success: snackSuccess, error: snackError } = useSnackbar()
 
   // Week offset state
-  const weekOffset = ref(0)
+  const weekOffset = ref(1)
 
   // Use the composable
   const {
@@ -48,16 +49,16 @@
 
   // Fetch data on mount
   onMounted(async () => {
-    // Fetch menu for the week FIRST
-    const weekStartDate = getWeekString(new Date())
+    // Fetch menu for next week FIRST
+    const weekStartDate = getWeekString(getWeekDates(1)[0])
     await fetchWeekMenu(weekStartDate)
 
     // THEN set active day (this will override the composable's default)
     if (route.query.date) {
       setActiveDay(route.query.date)
     } else {
-      // Fallback to Monday
-      const dates = getWeekDates(weekOffset.value)
+      // Fallback to Monday of next week
+      const dates = getWeekDates(1)
       const mondayDate = formatDate(dates[0])
       setActiveDay(mondayDate)
     }
@@ -173,13 +174,37 @@
   function handleMarkOffDay () {
     showOffDayDialog.value = true
   }
+
+  // Smart back button fallback helper
+  function goBack() {
+    if (window.history.state && window.history.state.back) {
+      router.back()
+    } else {
+      router.push('/hr-dashboard')
+    }
+  }
 </script>
 
 <template>
   <AppShell>
     <div style="max-width: 1400px; margin: 0 auto; padding: 0 16px;">
+      <!-- Back button -->
+      <v-row class="d-flex align-center justify-space-between">
+        <v-col class="d-flex justify-start align-center" cols="12" sm="6">
+          <v-btn
+            prepend-icon="mdi-arrow-left"
+            variant="flat"
+            color="#D2451E"
+            class="mr-2 mt-4"
+            @click="goBack"
+          > 
+          Go back 
+          </v-btn>
+        </v-col>
+      </v-row>
+
       <!-- Page Header -->
-      <v-row class="mb-3 d-flex align-center justify-space-between">
+      <v-row class="mb-4 mt-n1 d-flex align-center justify-space-between">
         <v-col class="d-flex justify-start" cols="12" sm="6">
           <h1
             class="font-weight-bold text-display-medium"
@@ -235,8 +260,8 @@
         </div>
 
         <!-- Loading State -->
-        <div v-if="isLoading" class="text-center py-8">
-          <v-progress-circular color="#D2451E" indeterminate size="45" />
+        <div v-if="isLoading" class="d-flex flex-column ga-2">
+          <SkeletonCard v-for="i in 3" :key="i" />
         </div>
 
         <!-- Food Items List -->
