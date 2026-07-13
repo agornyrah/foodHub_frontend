@@ -69,7 +69,7 @@
     // Strip the year for a cleaner look
     const rangeShort = range.split(',')[0]
 
-    return `${formattedToday} • Week of ${rangeShort}`
+    return `${formattedToday}; Week of ${rangeShort}`
   })
 
   // Monday date string for the next week
@@ -333,8 +333,8 @@
             <v-btn
               color="#D2451E"
               prepend-icon="mdi-history"
-              variant="outlined"
-              class="text-capitalize font-weight-bold"
+              variant="flat"
+              class="text-capitalize font-weight-bold px-8 py-5"
               @click="router.push('/my-order-history')"
             >
              View All History

@@ -19,6 +19,18 @@
 
   const vendorOptions = [...VENDORS, 'Other']
 
+  // Form validation
+  const titleRules = [
+    v => !!v || 'Title is required',
+    v => (v && v.length >= 3) || 'Title must be at least 3 characters',
+  ]
+
+  const vendorRule = [
+    v => !!v || 'Vendor Name is required',
+    v => (v && v.length >= 2) || 'Vendor name must be at least 2 characters',
+  ]
+
+  // Create a new item section with parameters
   function createEmptyRow (){
     return {
         title: '',
@@ -34,16 +46,19 @@
     rows.value = [createEmptyRow()]
   }
 
+  // Add a new item section with parameters already in the function above
   function addRow () {
     rows.value.push(createEmptyRow())
   }
 
+  // Delete an item section
   function removeRow (index) {
     if (rows.value.length === 1) {
       resetRows()
       return
     }
 
+    // A method to remove one item at a time starting from the active item section
     rows.value.splice(index, 1)
   }
 
@@ -51,14 +66,18 @@
     emit('update:modelValue', false)
   }
 
+  // Function to allow file upload for each item section and image upload input individually
   function handleRowFileUpload (index, file) {
     if(file){
+        // For example row.value[0].imageUrl -> First row item section image input
+        // Populate with image url extracted from the image uploaded
         rows.value[index].imageUrl = URL.createObjectURL(file)
     } else{
         rows.value[index].imageUrl = ''
     }
   }
 
+  // Function to polish inputs and provide necessary logic
   function normalizeRow (row) {
     return {
       title: row.title.trim(),
@@ -70,12 +89,14 @@
     }
   }
 
+  // Reactive check of row inputs
   const normalizedRows = computed(() => {
     return rows.value
       .map(row => normalizeRow(row))
       .filter(row => row.title || row.description || row.type)
   })
 
+  // Function to validate inputs; more like input rules
   const hasValidRows = computed(() => {
     if (normalizedRows.value.length === 0) return false
 
@@ -92,6 +113,7 @@
     emit('save', normalizedRows.value)
   }
 
+  // Watch for food item inputs when dialog opens
   watch(() => props.modelValue, isOpen => {
     if (isOpen) {
       resetRows()
@@ -101,7 +123,7 @@
 
 <template>
   <v-dialog
-    max-width="900"
+    max-width="600"
     :model-value="modelValue"
     persistent
     @update:model-value="emit('update:modelValue', $event)"
@@ -157,10 +179,7 @@
                     density="comfortable"
                     label="Food Title *"
                     placeholder="e.g. Jollof Rice"
-                    :rules="[
-                      v => !!v || 'Title is required',
-                      v => (v && v.trim().length >= 3) || 'Title must be at least 3 characters',
-                    ]"
+                    :rules="titleRules"
                     variant="outlined"
                   />
                 </v-col>
@@ -178,7 +197,7 @@
                 </v-col>
 
                 <!-- Image Upload -->
-                <v-col cols="12" md="4">
+                <v-col cols="12" md="6">
                   <v-file-input
                     v-model="row.imageFile"
                     accept="image/png, image/jpeg, image/jpg, image/webp"
@@ -193,7 +212,7 @@
                 </v-col>
 
                  <!-- Vendor Type -->
-                <v-col cols="12" md="4">
+                <v-col cols="12" md="6">
                   <v-select
                     v-model="row.type"
                     density="comfortable"
@@ -203,16 +222,13 @@
                   />
                 </v-col>
 
-                <v-col v-if="row.type === 'Other'" cols="12" md="3">
+                <v-col v-if="row.type === 'Other'" cols="12" md="12">
                   <v-text-field
                     v-model="row.otherType"
                     density="comfortable"
-                    label="Custom Vendor *"
+                    label="Custom Vendor Type *"
                     placeholder="e.g. Local Joint"
-                    :rules="[
-                      v => !!v || 'Custom vendor is required',
-                      v => (v && v.trim().length >= 2) || 'At least 2 characters',
-                    ]"
+                    :rules="vendorRule"
                     variant="outlined"
                   />
                 </v-col>

@@ -145,6 +145,7 @@ export async function createBulkMenuApi (items) {
       }
     })
 
+    // Implement an asynchronous operation of image uploads.
     const itemsWithUrls = await Promise.all(uploadBulk)
 
     //Map items to backend schema format
@@ -163,11 +164,27 @@ export async function createBulkMenuApi (items) {
       items: backendItems
     })
 
+    // ALTERNATIVE mapping constant
+    // const menuItem = response.data
+
     return {
       success: true,
       data: response.data.map(mapMenuItemFromBackend),
+
+      // Corresponding ALTERNATIVE mapping data
+      // data: {
+      //   id: menuItem.id,
+      //   title: menuItem.title,
+      //   description: menuItem.description,
+      //   imageUrl: menuItem.image_url,
+      //   type: menuItem.type,
+      //   day: menuItem.day,
+      //   date: menuItem.date,
+      //   weekString: menuItem.week_string,
+      //   status: menuItem.status,
+      // }
     }
-    } catch (error) {
+  } catch (error) {
         if (import.meta.env.VITE_USE_MOCK_MENU === 'true') {
             const menuItems = getMockMenuItems()
             const created = items.map((item, index) => ({
