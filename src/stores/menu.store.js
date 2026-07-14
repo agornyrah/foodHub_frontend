@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { createMenuApi, deleteMenuApi, getAllMenuItemsApi, getWeekDeadlineApi, setWeekDeadlineApi, updateMenuApi } from '../api/menu.api.js'
+import { createMenuApi, createBulkMenuApi, deleteMenuApi, getAllMenuItemsApi, getWeekDeadlineApi, setWeekDeadlineApi, updateMenuApi } from '../api/menu.api.js'
 
 export const useMenuStore = defineStore('menu', {
   state: () => ({
@@ -8,6 +8,9 @@ export const useMenuStore = defineStore('menu', {
     weekDeadlines: JSON.parse(localStorage.getItem('foodhub:weekDeadlines') || '{}'),
     isLoading: false,
     error: null,
+
+    // WebSocket state
+    socket: null,
   }),
 
   getters: {
@@ -24,11 +27,11 @@ export const useMenuStore = defineStore('menu', {
 
   actions: {
     // function to get all menu items
-    async getAllMenuItems () {
+    async getAllMenuItems (params = {}) {
       this.isLoading = true
       this.error = null
       try {
-        const response = await getAllMenuItemsApi()
+        const response = await getAllMenuItemsApi(params)
         if (response.success) {
           this.allMenuItems = response.data
         } else {
@@ -62,6 +65,31 @@ export const useMenuStore = defineStore('menu', {
           return false
         }
         return true
+      } catch (error) {
+        this.error = error
+        return false
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    // function to create a BULK menu
+    async createBulkMenu (items) {
+      this.isLoading = true
+      this.error = null
+      try {
+        const response = await createBulkMenuApi(items)
+        if (response.success) {
+          
+          //Add the menu directly without calling the whole list
+          this.allMenuItems.push(...response.data)
+          //await this.getAllMenuItems() // Pulls the updated list immediately
+          this.error = null
+          return true
+        } else {
+          this.error = response.error
+          return false
+        }
       } catch (error) {
         this.error = error
         return false
@@ -170,5 +198,53 @@ export const useMenuStore = defineStore('menu', {
         this.isLoading = false
       }
     },
+
+    // WebSocket Actions
+    connectWebSocket (){
+      if (this.socket) return
+
+      const token = window.sessionStorage.getItem('token')
+      if (!token) return
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+      const wsProtocol = window.location.protocol === 'https' ? 'wss' : 'ws'
+
+      // Points to /menu/ws endpoint in the menu-router backend
+      const wsUrl = `${wsProtocol}://${baseUrl.replace(/https?:\/\//, '')}/menu/ws?token=${token}`
+
+      this.socket = new WebSocket(wsUrl)
+
+      this.socket.onmessage = async (event) => {
+        const data = JSON.parse(event.data)
+        
+        if (data.type === 'menu_updated') {
+          // Trigger a silent refresh of menu items in the background
+          await this.getAllMenuItems()
+          
+          // Optionally trigger window event if specific pages need local alerts
+          window.dispatchEvent(new CustomEvent('foodhub:menu-updated', { detail: data }))
+        } else if (data.type === 'deadline_updated') {
+          // Refetch deadline for that week
+          await this.getWeekDeadline(data.week_string)
+          window.dispatchEvent(new CustomEvent('foodhub:deadline-updated', { detail: data }))
+        }
+      }
+      this.socket.onclose = () => {
+        this.socket = null
+        // Reconnect every 5 seconds if authenticated
+        setTimeout(() => {
+          if (window.sessionStorage.getItem('token')) {
+            this.connectWebSocket()
+          }
+        }, 5000)
+      }
+    },
+    
+    disconnectWebSocket () {
+      if (this.socket) {
+        this.socket.close()
+        this.socket = null
+      }
+    }
   },
 })

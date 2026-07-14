@@ -141,9 +141,9 @@ export function useWeekMenu () {
   async function fetchWeekMenu (weekStartDate) {
     activeWeek.value = weekStartDate
 
-    // Fetch menu items and the deadline in parallel
+    // Fetch ONLY menu items for the target week and the deadline in parallel
     const [okMenu, okDeadline] = await Promise.all([
-      menuStore.getAllMenuItems(),
+      menuStore.getAllMenuItems({ week_string: weekStartDate }),
       menuStore.getWeekDeadline(weekStartDate),
     ])
 
@@ -193,6 +193,7 @@ export function useWeekMenu () {
 
     // HR store actions passed through so HR views don't import the store directly
     createMenu: menuStore.createMenu,
+    createBulkMenu: menuStore.createBulkMenu,
     updateMenu: menuStore.updateMenu,
     deleteMenu: menuStore.deleteMenu,
   }

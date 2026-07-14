@@ -48,13 +48,13 @@
     v => (v && v.length >= 3) || 'Title must be at least 3 characters',
   ]
 
-  const descriptionRules = [
-    // v => !!v || 'Description is required',
-    v => {
-      if (v && v.length >= 10) return 'Description must be at least 10 characters'
-      return true
-    }
-  ]
+  // const descriptionRules = [
+  //   // v => !!v || 'Description is required',
+  //   v => {
+  //     if (v && v.length >= 10) return 'Description must be at least 10 characters'
+  //     return true
+  //   }
+  // ]
 
   const imageRules = [
     v => {
@@ -218,7 +218,6 @@
               v-model="formData.description"
               placeholder="e.g. Jollof Rice with chicken and pepper"
               rows="3"
-              :rules="descriptionRules"
               variant="outlined"
             />
           </div>

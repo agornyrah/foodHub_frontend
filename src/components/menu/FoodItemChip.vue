@@ -53,9 +53,8 @@
       <div
         v-else
         class="d-flex align-center justify-center fill-height"
-        :style="{ backgroundColor: typeIconBg }"
       >
-        <v-icon :color="typeBadgeColor" size="16">mdi-food</v-icon>
+        <v-icon color="#D2451E" size="24">mdi-food</v-icon>
       </div>
     </v-avatar>
 

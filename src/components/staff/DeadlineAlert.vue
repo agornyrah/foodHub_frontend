@@ -77,7 +77,7 @@
     <!-- Text Section -->
     <div class="flex-grow-1">
       <div class="font-weight-bold" :style="{ color: 'white' }" style="font-size: 20px;">
-        {{ isPassed ? 'Ordering deadline has passed' : (isUrgent ? 'Urgent: Complete your meal selection!' : 'Select your meals for next week') }}
+        {{ isPassed ? 'Ordering deadline has passed' : (isUrgent ? 'Urgent: Click this banner to Complete your meal selection!' : 'Click this banner to Select your meals for next week') }}
       </div>
 
       <div :style="{ color: isPassed ? 'white' : 'white' }" class="font-weight-medium">

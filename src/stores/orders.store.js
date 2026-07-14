@@ -21,11 +21,11 @@ export const useOrderStore = defineStore('order', {
 
   actions: {
     // function to get all orders
-    async getAllOrders () {
+    async getAllOrders (params = {}) {
       this.isLoading = true
       this.error = null
       try {
-        const response = await getAllOrdersApi()
+        const response = await getAllOrdersApi(params)
         if (response.success) {
           this.allOrders = response.data
         } else {

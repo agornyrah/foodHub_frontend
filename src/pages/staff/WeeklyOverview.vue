@@ -62,9 +62,6 @@
       updateCountdown()
       timer = setInterval(updateCountdown, 1000)
       
-      // Poll the backend every 60 seconds for deadline changes made by HR
-      pollTimer = setInterval(() => menuStore.getWeekDeadline(nextWeekStart.value), 60_000)
-      
     } catch (error) {
       console.error('Failed to load menu/order overview:', error)
     } finally {
@@ -201,12 +198,12 @@
   // Action handlers
   async function handleSubmit () {
     await submitDraft()
-    router.push('/staff-dashboard')
+    router.push('/my-order-history')
   }
 
   async function handleSaveDraft () {
     await saveDraft()
-    router.push('/staff-dashboard')
+    router.push('/my-order-history')
   }
 
   // Smart back button fallback helper
@@ -221,7 +218,6 @@
   // Clean up the timer when leaving the page
   onUnmounted(() => {
     if (timer) clearInterval(timer)
-    if (pollTimer) clearInterval(pollTimer)
   })
 </script>
 

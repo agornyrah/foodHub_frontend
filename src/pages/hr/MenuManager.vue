@@ -3,6 +3,7 @@
   import { useRoute, useRouter } from 'vue-router'
   import AppShell from '@/components/layout/AppShell.vue'
   import FoodFormDialog from '@/components/menu/FoodFormDialog.vue'
+  import BulkFoodFormDialog from '@/components/menu/BulkFoodFormDialog.vue'
   import OffDayDialog from '@/components/menu/OffDayDialog.vue'
   import WeekStrip from '@/components/menu/WeekStrip.vue'
   import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -34,12 +35,14 @@
     fetchWeekMenu,
     setActiveDay,
     createMenu,
+    createBulkMenu,
     updateMenu,
     deleteMenu,
   } = useWeekMenu()
 
   // Dialog states
   const showFoodDialog = ref(false)
+  const showBulkFoodDialog = ref(false)
   const showOffDayDialog = ref(false)
   const actionType = ref(null) // 'delete' or 'off_day'
   const showDeleteDialog = ref(false)
@@ -115,6 +118,11 @@
     showFoodDialog.value = true
   }
 
+  //Add bulk food items
+  function handleAddMultipleFoods () {
+    showBulkFoodDialog.value = true
+  }
+
   // Edit food item
   function handleEditFood (item) {
     editingFood.value = item
@@ -167,6 +175,34 @@
       snackSuccess(editingFood.value ? 'Food item updated' : 'Food item added')
     } else {
       snackError('Failed to save food item')
+    }
+  }
+
+  //Save Bulk food items
+  async function handleSaveBulkFoods (foods){
+    const dayName = new Date(activeDay.value + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' })
+
+    const items = foods.map(food => ({
+      ...food,
+      day: dayName,
+      date: activeDay.value,
+      weekString: getWeekString(parseLocalDate(activeDay.value)),
+      imageUrl: food.imageUrl || '',
+      status: null,
+    }))
+
+    if (activeDayIsOff.value) {
+      snackError('Cannot add food items to an off day')
+      return
+    }
+
+    const success = await createBulkMenu(items)
+
+    if (success) {
+      showBulkFoodDialog.value = false
+      snackSuccess(`${items.length} food items added`)
+    } else{
+      snackError('Failed to add food items')
     }
   }
 
@@ -253,7 +289,7 @@
             variant="flat"
             prepend-icon="mdi-plus"
             class="text-capitalize font-weight-bold px-6 w-100 w-sm-auto"
-            @click="handleAddFood"
+            @click="handleAddMultipleFoods"
           >
             Add food item
           </v-btn>
@@ -283,6 +319,7 @@
                     :src="item.imageUrl"
                     :alt="item.title"
                     cover
+                    loading="lazy"
                   >
                     <template #error>
                       <div class="d-flex align-center justify-center fill-height bg-grey-lighten-3">
@@ -366,6 +403,12 @@
       :food-item="editingFood"
       :loading="isLoading"
       @save="handleSaveFood"
+    />
+
+    <BulkFoodFormDialog
+      v-model="showBulkFoodDialog"
+      :loading="isLoading"
+      @save="handleSaveBulkFoods"
     />
 
     <OffDayDialog

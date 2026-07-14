@@ -36,17 +36,27 @@
   // Fetch data on mount
   onMounted(async () => {
     isLoading.value = true
+    const weekStartDate = getWeekString(getWeekDates(weekOffset.value)[0])
+    
     await Promise.all([
       staffStore.getAllStaff(),
-      orderStore.getAllOrders(),
-      menuStore.getAllMenuItems(),
+      orderStore.getAllOrders({ week_string: weekStartDate, limit: 100 }),
+      menuStore.getAllMenuItems({ week_string: weekStartDate, limit: 100 }),
     ])
     isLoading.value = false
   })
 
   // Week change handler
-  function handleWeekChange (newOffset) {
+  async function handleWeekChange (newOffset) {
     weekOffset.value = newOffset
+    isLoading.value = true
+
+    const weekStartDate = getWeekString(getWeekDates(newOffset)[0])
+    await Promise.all([
+      orderStore.getAllOrders({ week_string: weekStartDate, limit: 100 }),
+      menuStore.getAllMenuItems({ week_string: weekStartDate, limit: 100 }),
+    ])
+    isLoading.value = false
   }
 
   // Get week dates

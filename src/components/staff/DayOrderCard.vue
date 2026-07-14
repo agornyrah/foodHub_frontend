@@ -114,7 +114,7 @@
 
           <!-- Food Image Thumbnail -->
           <v-avatar class="flex-shrink-0" rounded="lg" size="52" style="background-color: #FBE9E7;">
-            <v-img v-if="item.imageUrl" :alt="item.title" cover :src="item.imageUrl">
+            <v-img v-if="item.imageUrl" :alt="item.title" cover :src="item.imageUrl" loading="lazy">
               <template #error>
                 <div class="d-flex align-center justify-center fill-height" style="background-color: #D2451E;">
                   <v-icon color="#D2451E" size="20">mdi-food</v-icon>

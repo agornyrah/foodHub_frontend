@@ -19,9 +19,9 @@ function saveMockOrders (orders) {
 }
 
 // function of axios api to get all requests
-export async function getAllOrdersApi () {
+export async function getAllOrdersApi ( params = {} ) {
   try {
-    const response = await api.get('/orders/all')
+    const response = await api.get('/orders/all', { params })
     const orders = response.data
 
     // Map snake_case database responses to frontend camelCase

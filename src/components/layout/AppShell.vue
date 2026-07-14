@@ -1,18 +1,32 @@
 <script setup>
-  import { computed, ref, watch } from 'vue'
+  import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
   import { useRoute, useRouter } from 'vue-router'
   import { useDisplay } from 'vuetify'
   import { useAuthStore } from '../../stores/auth.store.js'
+  import { useMenuStore } from '../../stores/menu.store.js'
   import HrNav from './HrNav.vue'
   import StaffNav from './StaffNav.vue'
   const { mobile } = useDisplay()
 
   const authStore = useAuthStore()
+  const menuStore = useMenuStore()
   const router = useRouter()
   const route = useRoute()
 
   // Drawer open/close state for mobile
   const drawer = ref(false)
+
+  // Use the connected token to validate authentication
+  onMounted(() => {
+    if(authStore.isAuthenticated){
+      menuStore.connectWebSocket()
+    }
+  })
+
+  // Diconnect token mount before connecting or after logout
+  onBeforeUnmount(() => {
+    menuStore.disconnectWebSocket()
+  })
 
   // Close the navigation drawer automatically when navigation occurs
   watch(() => route.path, () => {
